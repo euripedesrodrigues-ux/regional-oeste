@@ -1,0 +1,48 @@
+# Base44 development environment for the "Regional Oeste" dashboard.
+#
+# The project is a single self-contained static HTML file (index.html.html) that
+# pulls its libraries from public CDNs at runtime. There is no package manager,
+# build step or backend, so the dev environment is just a static file server that
+# serves the repo straight from the bind mount (edits show up without a rebuild)
+# and injects a live-reload client.
+#
+# The Firebase Realtime Database it talks to is configured inside the HTML file
+# itself; no environment variables or secrets are required to run it locally.
+
+services:
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    restart: on-failure
+    ports:
+      - "3000:3000"
+    volumes:
+      # The whole repo is the document root: edit index.html.html and the page reloads.
+      - .:/app
+      # Cache npx downloads so restarts are instant after the first boot.
+      - npm_cache:/root/.npm
+    environment:
+      - NPM_CONFIG_UPDATE_NOTIFIER=false
+      - NPM_CONFIG_FUND=false
+    # The entry file has a double extension (index.html.html), so it is passed
+    # explicitly instead of renaming the user's file.
+    command:
+      - sh
+      - -ec
+      - |
+        exec npx --yes live-server@1.2.2 \
+          --port=3000 \
+          --host=0.0.0.0 \
+          --entry-file=index.html.html \
+          --watch=index.html.html \
+          --wait=200 \
+          --no-browser
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/ | grep -q 'Regional Oeste'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+volumes:
+  npm_cache:
